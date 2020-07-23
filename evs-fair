@@ -6,19 +6,43 @@ import pyfair
 import io
 import matplotlib.pyplot as plt
 import urllib.parse as urlparse
+import traceback
 
 class Handler(http.server.BaseHTTPRequestHandler):
 
-    def load_model(self, name, model_spec):
-        model = pyfair.FairModel(name=name, n_simulations=10_000)
-        model.bulk_import_data(model_spec)
-        model.calculate_all()
-        return model
-        
-    def distribution(self, name, model_spec):
-        model = self.load_model(name, model_spec)
+    # Returns list of models
+    def load_model(self, spec, all):
 
-        dc = pyfair.report.distribution.FairDistributionCurve(model)
+        name = spec["name"]
+        params = spec["parameters"]
+        
+        if type(params) == dict:
+
+            model = pyfair.FairModel(name=name, n_simulations=10_000)
+            model.bulk_import_data(params)
+            all.append(model)
+            return model
+
+        if type(params) == list:
+
+            print("WORKING IT")
+            models = [
+                self.load_model(m, all) for m in params
+            ]
+            print(models)
+            metamodel = pyfair.FairMetaModel(name=name, models=models)
+            all.append(metamodel)
+            return metamodel
+
+        raise RuntimeError("Bad model parameters")
+    
+    def distribution(self, model_spec):
+
+        all = []
+        model = self.load_model(model_spec, all)
+        model.calculate_all()
+
+        dc = pyfair.report.distribution.FairDistributionCurve(all)
         fig, ax = dc.generate_image()
 
         buf = io.BytesIO()
@@ -29,10 +53,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         return data
 
-    def exceedence(self, name, model_spec):
-        model = self.load_model(name, model_spec)
+    def exceedence(self, model_spec):
 
-        dc = pyfair.report.exceedence.FairExceedenceCurves(model)
+        all = []
+        model = self.load_model(model_spec, all)
+        model.calculate_all()
+
+        dc = pyfair.report.exceedence.FairExceedenceCurves(all)
         fig, ax = dc.generate_image()
 
         buf = io.BytesIO()
@@ -44,59 +71,49 @@ class Handler(http.server.BaseHTTPRequestHandler):
         return data
 
     def __init__(self, request, client_address, server):
-        print("Handler __init__");
         super().__init__(request, client_address, server)
+
+    def invoke(self, report, model):
+
+        print(report, model)
+        if report == "exceedence":
+            image = self.exceedence(model)
+        elif report == "distribution":
+            image = self.distribution(model)
+        else:
+            raise RuntimeError("Report %s not known" % report)
+        
+        self.send_response(200)
+        self.send_header("Content-Length", len(image))
+        self.send_header("Content-Type", "image/png")
+        self.end_headers()
+        self.wfile.write(image)
         
     def do_GET(self):
 
         try:
-            o = urlparse.urlparse(self.path)
-            parms = urlparse.parse_qs(o.query)
-            print(o)
-            print(parms)
-            report = parms["report"][0]
-            model = json.loads(parms["model"][0])
-
-            if report == "exceedence":
-                image = self.exceedence("Basic model", model)
-            elif report == "distribution":
-                image = self.distribution("Basic model", model)
-            else:
-                raise RuntimeError("Report %s not known" % report)
-
-            self.send_response(200)
-            self.send_header("Content-Length", len(image))
-            self.send_header("Content-Type", "image/png")
-            self.end_headers()
-            self.wfile.write(image)
+            components = urlparse.urlparse(self.path)
+            params = urlparse.parse_qs(components.query)
+            report = params["report"][0]
+            model = json.loads(params["model"][0])
+            return self.invoke(report, model)
 
         except Exception as e:
-            print(e)
+            print(repr(e))
+            traceback.print_exc()
 
     def do_POST(self):
-        content_length = int(self.headers['Content-Length'])
-        in_data = self.rfile.read(content_length)
-        print("POST")
-        in_params = json.loads(in_data)
 
         try:
+            content_length = int(self.headers['Content-Length'])
+            data = self.rfile.read(content_length)
+            params = json.loads(data)
 
-            if in_params["report"] == "exceedence":
-                image = self.exceedence("Basic model", in_params["model"])
-            elif in_params["report"] == "distribution":
-                image = self.distribution("Basic model", in_params["model"])
-            else:
-                raise RuntimeError("Report %s not known" % in_params["report"])
-
-            self.send_response(200)
-            self.send_header("Content-Length", len(image))
-            self.send_header("Content-Type", "image/png")
-            self.end_headers()
-            self.wfile.write(image)
+            return self.invoke(params["report"], params["model"])
 
         except Exception as e:
-            print(e)
-
+            print(repr(e))
+            traceback.print_exc()
 srv = http.server.HTTPServer(("", 9876), Handler)
 srv.serve_forever()
 

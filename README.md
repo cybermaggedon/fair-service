@@ -5,7 +5,9 @@ Built on top of the excellent [pyfair](https://github.com/theonaunheim/pyfair)
 library.
 
 It turns a FAIR model specification into an image presenting either the Loss
-Exceedance curve, or the probability distribution curve.
+Exceedance curve, or the probability distribution curve.  The idea is to allow
+embedding these report images in other web applications by posting the
+model specification to this service.
 
 It is a web server which you feed FAIR model data, either as a POST or
 in the URL which returns a png image.

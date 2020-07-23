@@ -15,21 +15,23 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         name = spec["name"]
         params = spec["parameters"]
-        
+        if "simulations" in spec:
+            simul=int(spec["simulations"])
+        else:
+            simul=10000
+            
         if type(params) == dict:
 
-            model = pyfair.FairModel(name=name, n_simulations=10_000)
+            model = pyfair.FairModel(name=name, n_simulations=simul)
             model.bulk_import_data(params)
             all.append(model)
             return model
 
         if type(params) == list:
 
-            print("WORKING IT")
             models = [
                 self.load_model(m, all) for m in params
             ]
-            print(models)
             metamodel = pyfair.FairMetaModel(name=name, models=models)
             all.append(metamodel)
             return metamodel
@@ -75,7 +77,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def invoke(self, report, model):
 
-        print(report, model)
         if report == "exceedence":
             image = self.exceedence(model)
         elif report == "distribution":
@@ -100,7 +101,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         except Exception as e:
             print(repr(e))
-            traceback.print_exc()
 
     def do_POST(self):
 
@@ -113,7 +113,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         except Exception as e:
             print(repr(e))
-            traceback.print_exc()
-srv = http.server.HTTPServer(("", 9876), Handler)
+
+srv = http.server.HTTPServer(("", 8080), Handler)
 srv.serve_forever()
 

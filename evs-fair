@@ -29,6 +29,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
         summary = fair.summary(model)
         return summary.to_json(indent=4).encode('utf-8'), "application/json"
 
+    def curves(self, model_spec):
+        all = {}
+        model = fair.load_model(model_spec, all)
+        model.calculate_all()
+        curves = fair.curves(model, all)
+        return json.dumps(curves, indent=4).encode('utf-8'), "application/json"
+
     def results(self, model_spec):
         all = {}
         model = fair.load_model(model_spec, all)
@@ -64,6 +71,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             data, type = self.distribution(model)
         elif report == "summary":
             data, type = self.summary(model)
+        elif report == "curves":
+            data, type = self.curves(model)
         elif report == "results":
             data, type = self.results(model)
         else:

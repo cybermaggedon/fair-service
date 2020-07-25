@@ -3,6 +3,8 @@ import pyfair
 import matplotlib.pyplot as plt
 import io
 import pandas as pd
+import numpy as np
+import scipy.stats as stats
 
 # all returns map of models
 def load_model(spec, all):
@@ -12,7 +14,7 @@ def load_model(spec, all):
     if "simulations" in spec:
         simul=int(spec["simulations"])
     else:
-        simul=10
+        simul=10000
 
     if type(params) == dict:
 
@@ -75,5 +77,68 @@ def summary(model):
 
     return summary
 
+def curves(model, all_models):
+
+    lef_points = 50
+    pdf_points = 50
+    risk_bins = 25
+
+    output = {}
+
+    results = model.export_results()
+    all_risk = results["Risk"]
+    all_max = all_risk.max()
+
+    prob_space = pd.Series(np.linspace(0, all_max, lef_points))
+
+    for name in all_models:
+
+        model = all_models[name]
+
+        model_out = {}
+        
+        risk = model.export_results()["Risk"]
+        risk_max = risk.max()
+
+        model_out["summary"] = {
+            'mean': risk.mean(),
+            'min': risk.min(),
+            'max': risk.max(),
+            'stddev': risk.std()
+        }
+
+        space = pd.Series(np.linspace(0, risk_max, lef_points))
+
+        prob = space.map(lambda x: stats.percentileofscore(risk, x))
+        loss = space.map(lambda value: (value < risk).mean()) * 100
+
+        model_out["prob"] = [
+            [space[v], prob[v]] for v in range(0, len(space))
+        ];
+
+        model_out["loss"] = [
+            [space[v], loss[v]] for v in range(0, len(space))
+        ];
+
+        beta_curve = stats.beta(*stats.beta.fit(risk))
+
+        pdf_space = np.linspace(0, risk_max, pdf_points)
+        pdf = beta_curve.pdf(pdf_space)
+
+        model_out["pdf"] = [
+            [pdf_space[v], pdf[v]]
+            for v in range(0, len(pdf_space))
+        ]
+
+        hist = np.histogram(risk, bins=risk_bins)
+
+        model_out["risk"] = [
+            [hist[1][v], int(hist[0][v])]
+            for v in range(0, risk_bins)
+        ];
+
+        output[name] = model_out
+
+    return output
 
 

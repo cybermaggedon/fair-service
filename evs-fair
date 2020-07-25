@@ -93,12 +93,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             return
 
-        print(self.path)
-
         try:
             components = urlparse.urlparse(self.path)
             params = urlparse.parse_qs(components.query)
-            print(params.keys())
             report = params["report"][0]
             model = json.loads(params["model"][0])
             return self.invoke(report, model)

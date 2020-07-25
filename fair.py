@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import io
 import pandas as pd
 
-# Returns list of models
+# all returns map of models
 def load_model(spec, all):
 
     name = spec["name"]
@@ -12,13 +12,13 @@ def load_model(spec, all):
     if "simulations" in spec:
         simul=int(spec["simulations"])
     else:
-        simul=10_000
+        simul=10
 
     if type(params) == dict:
 
         model = pyfair.FairModel(name=name, n_simulations=simul)
         model.bulk_import_data(params)
-        all.append(model)
+        all[name] = model
         return model
 
     if type(params) == list:
@@ -27,14 +27,16 @@ def load_model(spec, all):
             load_model(m, all) for m in params
         ]
         metamodel = pyfair.FairMetaModel(name=name, models=models)
-        all.append(metamodel)
+        all[name] = metamodel
         return metamodel
 
     raise RuntimeError("Bad model parameters")
 
 def distribution_image(models):
 
-    dc = pyfair.report.distribution.FairDistributionCurve(models)
+    dc = pyfair.report.distribution.FairDistributionCurve(
+        [models[k] for k in models]
+    )
     fig, ax = dc.generate_image()
 
     buf = io.BytesIO()
@@ -47,7 +49,9 @@ def distribution_image(models):
 
 def exceedence_image(models):
 
-    dc = pyfair.report.exceedence.FairExceedenceCurves(models)
+    dc = pyfair.report.exceedence.FairExceedenceCurves(
+        [models[k] for k in models]
+    )
     fig, ax = dc.generate_image()
 
     buf = io.BytesIO()

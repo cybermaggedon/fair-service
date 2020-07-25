@@ -11,29 +11,46 @@ import sys
 class Handler(http.server.BaseHTTPRequestHandler):
 
     def distribution(self, model_spec):
-        all = []
+        all = {}
         model = fair.load_model(model_spec, all)
         model.calculate_all()
         return fair.distribution_image(all)
 
     def exceedence(self, model_spec):
-        all = []
+        all = {}
         model = fair.load_model(model_spec, all)
         model.calculate_all()
         return fair.exceedence_image(all)
 
     def summary(self, model_spec):
-        all = []
+        all = {}
         model = fair.load_model(model_spec, all)
         model.calculate_all()
         summary = fair.summary(model)
         return summary.to_json(indent=4).encode('utf-8'), "application/json"
 
     def results(self, model_spec):
-        all = []
+        all = {}
         model = fair.load_model(model_spec, all)
         model.calculate_all()
-        r = model.export_results().to_json(indent=4).encode('utf-8')
+
+        res = model.export_results()
+        # The meta model has results called 'Risk' instead of the
+        # overall model's name.
+        r = {}
+        for k in res:
+            if k == "Risk":
+                r[model._name] = res[k]
+            else:
+                r[k] = res[k]
+
+        r = {
+            k: r[k].values.tolist()
+            for k in r
+        }
+
+        r = json.dumps(r, indent=4).encode('utf-8')
+
         return r, "application/json"
 
     def __init__(self, request, client_address, server):

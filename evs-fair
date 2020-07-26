@@ -36,6 +36,34 @@ class Handler(http.server.BaseHTTPRequestHandler):
         curves = fair.curves(model, all)
         return json.dumps(curves, indent=4).encode('utf-8'), "application/json"
 
+    def loss(self, model_spec):
+        all = {}
+        model = fair.load_model(model_spec, all)
+        model.calculate_all()
+        loss = fair.loss(model, all)
+        return json.dumps(loss, indent=4).encode('utf-8'), "application/json"
+
+    def summary(self, model_spec):
+        all = {}
+        model = fair.load_model(model_spec, all)
+        model.calculate_all()
+        summary = fair.summary(model, all)
+        return json.dumps(summary, indent=4).encode('utf-8'), "application/json"
+
+    def pdf(self, model_spec):
+        all = {}
+        model = fair.load_model(model_spec, all)
+        model.calculate_all()
+        pdf = fair.pdf(model, all)
+        return json.dumps(pdf, indent=4).encode('utf-8'), "application/json"
+
+    def risk(self, model_spec):
+        all = {}
+        model = fair.load_model(model_spec, all)
+        model.calculate_all()
+        risk = fair.risk(model, all)
+        return json.dumps(risk, indent=4).encode('utf-8'), "application/json"
+
     def results(self, model_spec):
         all = {}
         model = fair.load_model(model_spec, all)
@@ -73,6 +101,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             data, type = self.summary(model)
         elif report == "curves":
             data, type = self.curves(model)
+        elif report == "loss":
+            data, type = self.loss(model)
+        elif report == "summary":
+            data, type = self.summary(model)
+        elif report == "pdf":
+            data, type = self.pdf(model)
+        elif report == "risk":
+            data, type = self.risk(model)
         elif report == "results":
             data, type = self.results(model)
         else:

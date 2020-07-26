@@ -68,18 +68,18 @@ def exceedence_image(models):
 
     return data, "image/png"
 
-def summary(model):
+# def summary(model):
 
-    results = model.export_results().T
+#     results = model.export_results().T
 
-    summary = pd.DataFrame({
-        'mean': results.mean(axis=1), 
-        'stdev': results.std(axis=1),
-        'min': results.min(axis=1),
-        'max': results.max(axis=1),
-    })
+#     summary = pd.DataFrame({
+#         'mean': results.mean(axis=1), 
+#         'stdev': results.std(axis=1),
+#         'min': results.min(axis=1),
+#         'max': results.max(axis=1),
+#     })
 
-    return summary
+#     return summary
 
 def curves(model, all_models):
 
@@ -184,13 +184,11 @@ def summary(model, all_models):
     for name in all_models:
 
         model = all_models[name]
-
-        model_out = {}
         
         risk = model.export_results()["Risk"]
         risk_max = risk.max()
 
-        model_out["summary"] = {
+        model_out = {
             'mean': risk.mean(),
             'min': risk.min(),
             'max': risk.max(),

@@ -7,21 +7,25 @@ import urllib.parse as urlparse
 import traceback
 import fair
 import sys
+from functools import lru_cache
 
-class Handler(http.server.BaseHTTPRequestHandler):
+class Engine:
 
+    @lru_cache(maxsize=500)
     def distribution(self, model_spec):
         all = {}
         model = fair.load_model(model_spec, all)
         model.calculate_all()
         return fair.distribution_image(all)
 
+    @lru_cache(maxsize=500)
     def exceedence(self, model_spec):
         all = {}
         model = fair.load_model(model_spec, all)
         model.calculate_all()
         return fair.exceedence_image(all)
 
+    @lru_cache(maxsize=500)
     def summary(self, model_spec):
         all = {}
         model = fair.load_model(model_spec, all)
@@ -29,6 +33,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         summary = fair.summary(model)
         return summary.to_json(indent=4).encode('utf-8'), "application/json"
 
+    @lru_cache(maxsize=500)
     def curves(self, model_spec):
         all = {}
         model = fair.load_model(model_spec, all)
@@ -36,6 +41,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         curves = fair.curves(model, all)
         return json.dumps(curves, indent=4).encode('utf-8'), "application/json"
 
+    @lru_cache(maxsize=500)
     def loss(self, model_spec):
         all = {}
         model = fair.load_model(model_spec, all)
@@ -43,6 +49,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         loss = fair.loss(model, all)
         return json.dumps(loss, indent=4).encode('utf-8'), "application/json"
 
+    @lru_cache(maxsize=500)
     def summary(self, model_spec):
         all = {}
         model = fair.load_model(model_spec, all)
@@ -50,6 +57,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         summary = fair.summary(model, all)
         return json.dumps(summary, indent=4).encode('utf-8'), "application/json"
 
+    @lru_cache(maxsize=500)
     def pdf(self, model_spec):
         all = {}
         model = fair.load_model(model_spec, all)
@@ -57,6 +65,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         pdf = fair.pdf(model, all)
         return json.dumps(pdf, indent=4).encode('utf-8'), "application/json"
 
+    @lru_cache(maxsize=500)
     def risk(self, model_spec):
         all = {}
         model = fair.load_model(model_spec, all)
@@ -64,6 +73,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         risk = fair.risk(model, all)
         return json.dumps(risk, indent=4).encode('utf-8'), "application/json"
 
+    @lru_cache(maxsize=500)
     def results(self, model_spec):
         all = {}
         model = fair.load_model(model_spec, all)
@@ -88,29 +98,37 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         return r, "application/json"
 
+class HashableDict(dict):
+    def __hash__(self):
+        return hash(json.dumps(self, sort_keys=True))
+
+class Handler(http.server.BaseHTTPRequestHandler):
+
     def __init__(self, request, client_address, server):
+        self.engine = server.engine
         super().__init__(request, client_address, server)
 
     def invoke(self, report, model):
 
+        # Make model hashable so that we can use LRU cache.
+        model = HashableDict(model)
+
         if report == "exceedence":
-            data, type = self.exceedence(model)
+            data, type = self.engine.exceedence(model)
         elif report == "distribution":
-            data, type = self.distribution(model)
+            data, type = self.engine.distribution(model)
         elif report == "summary":
-            data, type = self.summary(model)
+            data, type = self.engine.summary(model)
         elif report == "curves":
-            data, type = self.curves(model)
+            data, type = self.engine.curves(model)
         elif report == "loss":
-            data, type = self.loss(model)
-        elif report == "summary":
-            data, type = self.summary(model)
+            data, type = self.engine.loss(model)
         elif report == "pdf":
-            data, type = self.pdf(model)
+            data, type = self.engine.pdf(model)
         elif report == "risk":
-            data, type = self.risk(model)
+            data, type = self.engine.risk(model)
         elif report == "results":
-            data, type = self.results(model)
+            data, type = self.engine.results(model)
         else:
             raise RuntimeError("Report %s not known" % report)
         
@@ -151,11 +169,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except Exception as e:
             print(repr(e))
 
+class Server(http.server.HTTPServer):
+    def __init__(self, addr, handler):
+        self.engine = Engine()
+        super().__init__(addr, handler)
+
 if len(sys.argv) <= 1:
     port=8080
 else:
     port=int(sys.argv[1])
 
-srv = http.server.HTTPServer(("", port), Handler)
+srv = Server(("", port), Handler)
 srv.serve_forever()
 
